@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VoteLive Report</title>
+  <%= csrf_meta_tags %>
+  <%= csp_meta_tag %>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h1>Real-Time Voting Report</h1>
+  <canvas id="voteChart" width="1000" height="300"></canvas>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const canvas = document.getElementById('voteChart');
+    if (!canvas) {
+      console.error("Canvas element not found! Make sure <canvas id='voteChart'> exists.");
+      return;
+    }
+
+    const ctx = canvas.getContext('2d');
+
+    let totalUpvotes = 0;
+    let totalDownvotes = 0;
+
+    const voteChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [], // Time labels
+        datasets: [
+          {
+            label: 'Upvotes',
+            data: [],
+            borderColor: 'green',
+            backgroundColor: 'rgba(0, 255, 0, 0.2)',
+            fill: true
+          },
+          {
+            label: 'Downvotes',
+            data: [],
+            borderColor: 'red',
+            backgroundColor: 'rgba(255, 0, 0, 0.2)',
+            fill: true
+          }
+        ]
+      },
+      options: {
+        responsive: false,
+        maintainAspectRatio: false,
+        scales: {
+          x: { 
+            title: { display: true, text: 'Time' }, 
+            ticks: { autoSkip: false, maxRotation: 45, minRotation: 45 } // Ensure readable labels
+          },
+          y: { 
+            title: { display: true, text: 'Total Votes' }, 
+            min: 0,  
+            max: 20,  // Start Y-axis at 20
+            ticks: { stepSize: 1 } 
+          }
+        }
+      }
+    });
+
+    // WebSocket connection for real-time vote updates
+    const cable = new WebSocket("ws://" + window.location.host + "/cable");
+
+    cable.onopen = () => {
+      cable.send(JSON.stringify({ command: "subscribe", identifier: JSON.stringify({ channel: "VoteChannel" }) }));
+    };
+
+    cable.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.message) {
+        const { vote_type, timestamp } = data.message;
+
+        let timeLabel = "";
+
+        if (timestamp) {
+          const time = new Date(timestamp);
+          if (!isNaN(time.getTime())) {
+            timeLabel = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          }
+        }
+
+        // Only add valid timestamps
+        if (timeLabel) {
+          voteChart.data.labels.push(timeLabel);
+
+          // Accumulate votes
+          if (vote_type === 'up') {
+            totalUpvotes++;
+          } else if (vote_type === 'down') {
+            totalDownvotes++;
+          }
+
+          // Update datasets
+          voteChart.data.datasets[0].data.push(totalUpvotes);
+          voteChart.data.datasets[1].data.push(totalDownvotes);
+
+          // Dynamically adjust Y-axis max
+          let maxVotes = Math.max(totalUpvotes, totalDownvotes);
+          if (maxVotes >= voteChart.options.scales.y.max) {
+            voteChart.options.scales.y.max += 10; // Increase Y-axis by 10 when the limit is reached
+          }
+
+          // Keep only the last 50 data points
+          if (voteChart.data.labels.length > 50) {
+            voteChart.data.labels.shift();
+            voteChart.data.datasets[0].data.shift();
+            voteChart.data.datasets[1].data.shift();
+          }
+
+          // Update the chart
+          voteChart.update();
+        }
+      }
+    };
+  });
+</script>
+
+</body>
+</html>

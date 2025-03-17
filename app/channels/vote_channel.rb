@@ -1,9 +1,7 @@
 class VoteChannel < ApplicationCable::Channel
   def subscribed
     stream_from "vote_channel"
-  end
-
-  def receive(data)
-    ActionCable.server.broadcast("vote_channel", data)
+    # Send current vote counts when a user subscribes
+    ActionCable.server.broadcast("vote_channel", Vote.counts)
   end
 end
