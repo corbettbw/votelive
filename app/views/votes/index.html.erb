@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VoteLive</title>
+  <%= csrf_meta_tags %>  <!-- Ensures CSRF token is included -->
+  <%= csp_meta_tag %>  <!-- Helps with Content Security Policy -->
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+    #vote-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    #upvote, #downvote {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      cursor: pointer;
+      color: white;
+      font-weight: bold;
+    }
+    #upvote { background: green; }
+    #downvote { background: red; }
+  </style>
+</head>
+<body>
+  <div id="vote-container">
+    <div id="upvote">Tap to Upvote</div>
+    <div id="downvote">Tap to Downvote</div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const upvote = document.getElementById("upvote");
+      const downvote = document.getElementById("downvote");
+
+      if (!upvote || !downvote) {
+        console.error("Upvote or Downvote element not found!");
+        return;
+      }
+
+      upvote.addEventListener("click", () => sendVote("up"));
+      downvote.addEventListener("click", () => sendVote("down"));
+
+      function sendVote(vote) {
+        const csrfToken = document.querySelector("meta[name='csrf-token']")?.getAttribute("content");
+
+        if (!csrfToken) {
+          console.error("CSRF token not found!");
+          return;
+        }
+
+        fetch("/vote", {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken
+          },
+          body: JSON.stringify({ vote: vote })
+        }).then(response => {
+          if (response.ok) {
+            console.log("Vote registered:", vote);
+          } else {
+            alert("There was an issue submitting your vote.");
+          }
+        }).catch(() => {
+          alert("Network error. Please try again.");
+        });
+      }
+    });
+  </script>
+</body>
+</html>
